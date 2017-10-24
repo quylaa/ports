@@ -2,10 +2,10 @@
 
 # IT 567 Port scanner, because we have to reinvent the wheel
 # Created by Aleks Christensen
-
-import scapy 
+ 
 import argparse
 import netaddr
+from scapy.all import sr1,IP,ICMP,TCP,UDP
 
 def main():
   args = parsing()
@@ -20,7 +20,7 @@ def parsing():
   parser.add_argument('-P', '--ports', action='store', nargs='+', help='Port(s) to scan on target(s).\nInput can be a single port, list of ports, or range.\nSingle port:\t22\nList:\t22,80,443,587,3389\nRange:\t1000-1500\nCombination:\t22,80,500-800')
   parser.add_argument('-f', dest='hostsfile', action='store', type=argparse.FileType('r'), help='Text file containing a list of hosts to scan, one IP address per line')
   parser.add_argument('-o', dest='outfile', action='store', type=argparse.FileType('w'), help='File to store the output of the scan in')
-  parser.add_argument('-r', dest='protocol', action='store', default='TCP', choices=['TCP', 'UDP'], help='Protocol to use when scanning')
+  parser.add_argument('-r', dest='protocol', action='store', default='TCP', choices=['TCP', 'UDP', 'ICMP'], help='Protocol to use when scanning')
 
   args = parser.parse_args()
 
@@ -30,7 +30,9 @@ def parsing():
   args.rawports = args.ports
   args.ports = parsePorts(args.ports[0].split(','))
 
-  return args
+  results = scan(args)
+
+  return results
 
 def parseHosts(rawhosts):
   hosts = []
@@ -63,7 +65,28 @@ def parsePorts(rawports):
   return ports
 
 
-def scan(hosts, ports):
-  return 0
+def scan(args):
+  localport=1584
+  results = []
+  if args.protocol == "ICMP":
+    for host in args.hosts:
+      p = sr1(IP(dst=str(host))/ICMP(), timeout=1)
+      if p:
+        results.append(p)
+  elif args.protocol == "TCP":
+    for host in args.hosts:
+      for port in args.ports:
+        p = sr1(IP(dst=str(host))/TCP(sport=localport,dport=port), timeout=1)
+        if p:
+          results.append(p)
+  elif args.protocol == "UDP":
+    for host in args.hosts:
+      for port in args.ports:
+        p = sr1(IP(dst=str(host))/UDP(sport=localport,dport=port), timeout=1)
+        if p:
+          results.append(p)
+  return results
+
+
 
 main()
