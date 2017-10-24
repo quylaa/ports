@@ -9,7 +9,7 @@ from scapy.all import sr1,IP,ICMP,TCP,UDP
 
 def main():
   args = parsing()
-  print args
+  print output(scan(args))
   return 0
 
 
@@ -30,9 +30,7 @@ def parsing():
   args.rawports = args.ports
   args.ports = parsePorts(args.ports[0].split(','))
 
-  results = scan(args)
-
-  return results
+  return args
 
 def parseHosts(rawhosts):
   hosts = []
@@ -50,8 +48,8 @@ def parseHosts(rawhosts):
         hosts.append(str(addr))
       continue
     else:
-      hosts.append(netaddr.IPAddress(host))
-  return hosts
+      hosts.append(str(netaddr.IPAddress(host)))
+  return list(set(hosts))
 
 def parsePorts(rawports):
   ports = []
@@ -62,31 +60,43 @@ def parsePorts(rawports):
         ports.append(p)
     else:
       ports.append(int(port))
-  return ports
+  return list(set(ports))
 
 
 def scan(args):
   localport=1584
-  results = []
+  results = {}
   if args.protocol == "ICMP":
     for host in args.hosts:
-      p = sr1(IP(dst=str(host))/ICMP(), timeout=1)
-      if p:
-        results.append(p)
+      p = sr1(IP(dst=str(host))/ICMP(), timeout=1, verbose=0)
+      if not p:
+        p = None
+      results[host+":"+str(port)] = p
   elif args.protocol == "TCP":
     for host in args.hosts:
       for port in args.ports:
-        p = sr1(IP(dst=str(host))/TCP(sport=localport,dport=port), timeout=1)
-        if p:
-          results.append(p)
+        p = sr1(IP(dst=str(host))/TCP(sport=localport,dport=port), timeout=1, verbose=0)
+        if not p:
+          p = None
+        results[host+":"+str(port)] = p
   elif args.protocol == "UDP":
     for host in args.hosts:
       for port in args.ports:
-        p = sr1(IP(dst=str(host))/UDP(sport=localport,dport=port), timeout=1)
-        if p:
-          results.append(p)
+        p = sr1(IP(dst=str(host))/UDP(sport=localport,dport=port), timeout=1, verbose=0)
+        if not p:
+          p = None
+        results[host+":"+str(port)] = p
   return results
 
-
+def output(results):
+  outString = ""
+  for target in sorted(results.iterkeys()):
+    tempStr = target + "\t"
+    if results[target] is None:
+      tempStr += "DOWN\n"
+    else:
+      tempStr += "UP\n"
+    outString += tempStr
+  return outString
 
 main()
