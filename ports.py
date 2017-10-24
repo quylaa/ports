@@ -5,6 +5,7 @@
 
 import scapy 
 import argparse
+import netaddr
 
 def main():
   args = parsing()
@@ -21,6 +22,39 @@ def parsing():
   parser.add_argument('-o', dest='outfile', action='store', type=argparse.FileType('w'), help='File to store the output of the scan in')
 
   args = parser.parse_args()
+
+  rawhosts = args.hosts[0].split(',')
+  hosts = []
+  for host in rawhosts:
+    if '-' in host:
+      raw = host.split('-')
+      startaddr = raw[0]
+      temp = startaddr.split('.')
+      endaddr = temp[0] + '.' + temp[1] + '.' + temp[2] + '.' + raw[1]
+      for addr in list(netaddr.IPRange(startaddr, endaddr)):
+        hosts.append(str(addr))
+      continue
+    if '/' in host:
+      for addr in list(netaddr.IPNetwork(host)):
+        hosts.append(str(addr))
+      continue
+    else:
+      hosts.append(netaddr.IPAddress(host))
+  args.rawhosts = args.hosts
+  args.hosts = hosts
+
+  rawports = args.ports[0].split(',')
+  ports = []
+  for port in rawports:
+    if '-' in port:
+      raw = port.split('-')
+      for p in range(int(raw[0]), int(raw[1])+1):
+        ports.append(p)
+    else:
+      ports.append(int(port))
+  args.rawports = args.ports
+  args.ports = ports
+
   return args
 
 #if __name__ == "__main__":
