@@ -2,6 +2,7 @@
 
 # IT 567 Port scanner, because we have to reinvent the wheel
 # Created by Aleks Christensen
+# https://github.com/quylaa/ports
  
 import argparse
 import netaddr
@@ -9,7 +10,12 @@ from scapy.all import sr1,IP,ICMP,TCP,UDP
 
 def main():
   args = parsing()
-  print output(scan(args))
+  if not args:
+    return -1
+  if args.outfile is not None:
+    outputFile(args, scan(args))
+  else:
+    print output(args, scan(args))
   return 0
 
 
@@ -24,11 +30,21 @@ def parsing():
 
   args = parser.parse_args()
 
-  args.rawhosts = args.hosts
-  args.hosts = parseHosts(args.hosts[0].split(','))
+  if args.hosts is not None:
+    args.rawhosts = args.hosts
+    args.hosts = parseHosts(args.hosts[0].split(','))
+  elif args.hostsfile is not None:
+    args.hosts = parseFile(args.hostsfile)
+  else:
+    print 'No scan targets specified! Exiting...'
+    return None
 
-  args.rawports = args.ports
-  args.ports = parsePorts(args.ports[0].split(','))
+  if args.ports is not None:
+    args.rawports = args.ports
+    args.ports = parsePorts(args.ports[0].split(','))
+  elif args.protocol != 'ICMP':
+    print 'No target ports specified! Exiting...'
+    return None
 
   return args
 
@@ -62,6 +78,13 @@ def parsePorts(rawports):
       ports.append(int(port))
   return list(set(ports))
 
+def parseFile(hostfile):
+  hosts = []
+  for line in hostfile:
+    line = line.rstrip()
+    if not line: continue
+    hosts.append(line)
+  return hosts
 
 def scan(args):
   localport=1584
@@ -71,7 +94,7 @@ def scan(args):
       p = sr1(IP(dst=str(host))/ICMP(), timeout=1, verbose=0)
       if not p:
         p = None
-      results[host+":"+str(port)] = p
+      results[host] = p
   elif args.protocol == "TCP":
     for host in args.hosts:
       for port in args.ports:
@@ -88,8 +111,8 @@ def scan(args):
         results[host+":"+str(port)] = p
   return results
 
-def output(results):
-  outString = ""
+def output(args, results):
+  outString = "Scan type: " + args.protocol + "\n"
   for target in sorted(results.iterkeys()):
     tempStr = target + "\t"
     if results[target] is None:
@@ -98,5 +121,19 @@ def output(results):
       tempStr += "UP\n"
     outString += tempStr
   return outString
+
+def outputFile(args, results):
+  outFile = args.outfile
+  outString = "<html>\n<head>\n<title>PORTScanner Results</title>\n</head>\n<body>\n<h3>Results of " + args.protocol + " scan:</h3><br>\n<ul>\n"
+  for target in sorted(results.iterkeys()):
+    tempStr = "<li>" + target + "\t\t"
+    if results[target] is None:
+      tempStr += "<span style=\"color: red;\">DOWN</span>"
+    else:
+      tempStr += "<span style=\"color: green;\">UP</span>"
+    tempStr += "</li><br>\n"
+    outString += tempStr
+  outString += "</ul>\n</body>\n</html>"
+  outFile.write(outString)
 
 main()
